@@ -6,7 +6,7 @@ require 'date'
 
 class Gallery
   # Basic string attributes
-  attr_reader :category, :date, :title, :url
+  attr_reader :title, :date, :url
   attr_reader :gid, :token
   # A list of string which is the url for each page,
   # with the format <root>/s/<page-token>/<gallery-id>-<page-num>
@@ -14,17 +14,26 @@ class Gallery
 
   # Use the <tr class="gtr[01]"> tag to
   # initialize the gallery object.
-  def initialize(row)
-    @category = row.children[0].child.child['alt']
-    @date = DateTime.parse(row.children[1].text)
-    @url = row.children[2].child.children[2].child['href']
-    @title = row.children[2].child.children[2].child.child.text
-    @gid, @token = @url.split('/')[-2..-1]
+  def initialize()
     @page_urls = []
   end
 
+  def initByKnownURL(url)
+    @title = nil
+    @date = nil
+    @url = url
+    @gid, @token = @url.split('/')[-2..-1]
+  end
+
+  def initByElement(element)
+    @title = row.children[2].child.children[2].child.child.text
+    @date = DateTime.parse(row.children[1].text)
+    @url = row.children[2].child.children[2].child['href']
+    @gid, @token = @url.split('/')[-2..-1]
+  end
+
   # Parse and extract the page urls from a given html document text.
-  # It has the potential danger that hte document isn't corresponding to
+  # It has the potential danger that the document isn't corresponding to
   # the gallery itself. But such an interface is suitable for async callback.
   #
   # case return > 0: the number of remaining gallery pages (hold several pages)
@@ -35,10 +44,41 @@ class Gallery
     @page_urls += parsed.xpath('//a[contains(@href, "/s/")]').map { |a| a['href'] }
 
     if isFirst
-      nav_bar = parsed.xpath('//table[@class="ptt"]/tbody/tr').children
-      return nav_bar.size - 3 # including the first one, and '<', '>'.
+      pages = parsed.xpath('//table[@class="ptt"]/tr').children[-2].children[0].xpath('text()').to_s.to_i
+      return pages - 1
     else
       return 0
+    end
+  end
+
+  ##
+  # One preview page contains several single pages.
+  # We will iterate on the preview page number to get all single pages' url.
+  def getPageList(cookies)
+    puts @url
+
+    document = RestClient.get @url, {:cookies => cookies}
+
+    if @title == nil
+      @title = (Nokogiri::HTML(document)).xpath("//h1[@id='gj']").xpath('text()')
+      document = RestClient.get @url, {:cookies => cookies}
+    end
+
+    puts "Get page list for gallery #{@title}"
+    puts "Parse the first preview page list"
+    getPageUrls(document).times do |page_num|
+      page_num += 1 # start from 0, but we need start from 1
+      puts "Fetch the #{page_num}th page list"
+      document = RestClient.get "#{@url}?p=#{page_num}", {:cookies => cookies}
+      getPageUrls(document)
+    end
+
+    if @page_urls.size == 0
+      puts "#{@title} is deprecated?"
+    else
+      puts "#{@page_urls.size} pages found"
+      path = "#{@gid}_#{@title}"
+      Dir.mkdir(path) if not File.directory?(path)
     end
   end
 
@@ -52,7 +92,8 @@ class Gallery
       img = RestClient.get img_url, {:cookies => cookies}
       puts "downloaded"
       filename = img_url.split('/')[-1]
-      filepath = File.join(gid, filename)
+      path = "#{@gid}_#{@title}"
+      filepath = File.join(path, filename)
       File.open(filepath, 'wb').write(img.body)
     rescue
       puts "download failed"
@@ -116,48 +157,4 @@ def getGalleriesAfter(date, url, filter, cookies)
     break if before.size != 0
   end
   return galleries
-end
-
-
-cookies = login(ARGV[4], ARGV[1], ARGV[2])
-
-puts "Get signed up"
-
-filter = {
-  'f_doujinshi' => 1,
-  'f_manga'     => 1,
-  'f_artistcg'  => 1,
-  'f_search'    => 'language:chinese$',
-  'f_apply'     => 'Apply+Filter'
-}
-
-due_date = Date::parse(ARGV[3])
-
-galleries = getGalleriesAfter(due_date, ARGV[0], filter, cookies)
-
-puts "Get #{galleries.size} galleries in total"
-
-# Get page list
-galleries.each do |gallery|
-  puts "Get page list for gallery #{gallery.title}"
-  document = RestClient.get gallery.url, {:cookies => cookies}
-  gallery.getPageUrls(document).times do |page_num|
-    page_num += 1 # start from 0, but we need start from 1
-    document = RestClient.get "#{gallery.url}?p=#{page_num}", {:cookies => cookies}
-    gallery.getPageUrls(document)
-  end
-
-  if gallery.page_urls.size == 0
-    puts "#{gallery.title} is deprecated?"
-  else
-    puts "#{gallery.page_urls.size} pages found"
-    Dir.mkdir(gallery.gid) if not File.directory?(gallery.gid)
-    File.open(File.join(gallery.gid, 'title'), 'w')
-        .write(gallery.title)
-  end
-end
-
-# Download pages
-galleries.each do |gallery|
-  gallery.downloadPages(cookies)
 end
