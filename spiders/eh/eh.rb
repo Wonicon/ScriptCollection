@@ -113,6 +113,9 @@ class Gallery
 end
 
 
+##
+# Login the <host> site with <username> and <password>.
+# Return the responsed cookies, as authentication used by other parts.
 def login(host, username, password)
   form = {
     'act' => 'Login',
@@ -121,9 +124,9 @@ def login(host, username, password)
     'UserName' => username, 
     'PassWord' => password
   }
-  resp = RestClient.post host, form, {
-    :content_type => 'application/x-www-form-urlencoded'
-  }
+  # Make the post recognized as a form submitted.
+  headers = { :content_type => 'application/x-www-form-urlencoded' }
+  resp = RestClient.post(host, form, headers)
   return resp.cookies
 end
 
