@@ -1,6 +1,10 @@
 require 'rest_client'
+require 'parallel'
 require 'nokogiri'
 require 'date'
+
+
+$jobs = 4
 
 
 class Gallery
@@ -31,71 +35,69 @@ class Gallery
     @gid, @token = @url.split('/')[-2..-1]
   end
 
-  # Parse and extract the page urls from a given html document text.
-  # It has the potential danger that the document isn't corresponding to
-  # the gallery itself. But such an interface is suitable for async callback.
-  #
-  # case return > 0: the number of remaining gallery pages (hold several pages)
-  # case return == 0: no need for further request
-  def getPageUrls(document)
-    isFirst = @page_urls.size == 0
-    parsed = Nokogiri::HTML(document)
-    @page_urls += parsed.xpath('//a[contains(@href, "/s/")]').map { |a| a['href'] }
+  ##
+  # Get the preview page number from the pagination bar.
+  def getPreviewPageNum(parsed_first_preview_page)
+    parsed_first_preview_page.xpath('//table[@class="ptt"]/tr').children[-2].children[0].xpath('text()').to_s.to_i
+  end
 
-    if isFirst
-      pages = parsed.xpath('//table[@class="ptt"]/tr').children[-2].children[0].xpath('text()').to_s.to_i
-      return pages - 1
-    else
-      return 0
-    end
+  ##
+  # Extract the page urls from a given parsed html document text.
+  def getPageUrls(document)
+    document.xpath('//a[contains(@href, "/s/")]').map { |a| a['href'] }
   end
 
   ##
   # One preview page contains several single pages.
   # We will iterate on the preview page number to get all single pages' url.
   def getPageList(cookies)
-    puts @url
+    document = Nokogiri::HTML(RestClient.get(@url, {:cookies => cookies}))
 
-    document = RestClient.get @url, {:cookies => cookies}
-
-    if @title == nil
-      @title = (Nokogiri::HTML(document)).xpath("//h1[@id='gj']").xpath('text()')
-      document = RestClient.get @url, {:cookies => cookies}
-    end
-
+    @title = document.xpath("//h1[@id='gj']").xpath('text()') if @title == nil
     puts "Get page list for gallery #{@title}"
-    puts "Parse the first preview page list"
-    getPageUrls(document).times do |page_num|
-      page_num += 1 # start from 0, but we need start from 1
-      puts "Fetch the #{page_num}th page list"
-      document = RestClient.get "#{@url}?p=#{page_num}", {:cookies => cookies}
-      getPageUrls(document)
+
+    preview_num = getPreviewPageNum(document)
+    puts "This gallery has #{preview_num} preview pages"
+
+    # Get the page urls from the first preview page.
+    # As we have already got the html text, we have no need to download it again.
+    @page_urls += getPageUrls(document)
+    # Get the page urls from the rest preview pages.
+    # As each preview page contains several pages, it will result in a nested array,
+    # so we need to flatten it at last.
+    @page_urls += Parallel.map((1...preview_num).to_a) do |preview_page_index|
+      puts "Fetch the #{preview_page_index + 1}th preview page"
+      html = RestClient.get("#{@url}?p=#{preview_page_index}", {:cookies => cookies})
+      getPageUrls(Nokogiri::HTML(html))
     end
+    @page_urls = @page_urls.flatten
 
     if @page_urls.size == 0
       puts "#{@title} is deprecated?"
     else
       puts "#{@page_urls.size} pages found"
-      path = "#{@gid}_#{@title}"
-      Dir.mkdir(path) if not File.directory?(path)
+      @path = "#{@gid}_#{@title}"
+      Dir.mkdir(@path) if not File.directory?(@path)
     end
+
+    puts "Page urls are as follows:"
+    puts @page_urls
   end
 
   def downloadSinglePage(page_url, cookies)
     begin
-      puts "fetch #{page_url}"
+      puts "Fetch #{page_url}"
       page = RestClient.get page_url, {:cookies => cookies}
       html = Nokogiri::HTML(page.body)
       img_url = html.xpath('//img[@id="img"]').first['src']
-      puts "download #{img_url}"
+      puts "Download #{img_url}"
       img = RestClient.get img_url, {:cookies => cookies}
-      puts "downloaded"
+      puts "Downloaded"
       filename = img_url.split('/')[-1]
-      path = "#{@gid}_#{@title}"
-      filepath = File.join(path, filename)
+      filepath = File.join(@path, filename)
       File.open(filepath, 'wb').write(img.body)
     rescue
-      puts "download failed"
+      puts "Download failed"
       sleep 30
       retry
     end
@@ -103,9 +105,11 @@ class Gallery
 
   def downloadPages(cookies)
     puts "Downloading #{@title}"
-    page_urls.each_with_index do |page_url, index|
+    completed = 0
+    Parallel.each_with_index(page_urls, :in_processors => $jobs) do |page_url, index|
       downloadSinglePage(page_url, cookies)
-      puts "#{index + 1}/#{page_urls.size} downloaded"
+      completed += 1
+      puts "#{completed}/#{page_urls.size} downloaded"
     end
   end
 
