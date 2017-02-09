@@ -1,12 +1,11 @@
 require './eh.rb'
 
-# CMD: ./one.rb url user pw forum
+# CMD: ./one.rb forum user pw gallery-url
 
-cookies = login(ARGV[3], ARGV[1], ARGV[2])
-puts cookies
+cookies = login(ARGV[0], ARGV[1], ARGV[2])
 puts "Get signed up"
 
 gallery = Gallery.new
-gallery.initByKnownURL(ARGV[0])
+gallery.initByKnownURL(ARGV[3])
 gallery.getPageList(cookies)
 gallery.downloadPages(cookies)

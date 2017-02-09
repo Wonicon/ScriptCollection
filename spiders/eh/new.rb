@@ -1,6 +1,8 @@
 require './eh.rb'
 
-cookies = login(ARGV[4], ARGV[1], ARGV[2])
+# CMD: ./new.rb forum user pw oldest-date
+
+cookies = login(ARGV[0], ARGV[1], ARGV[2])
 
 puts "Get signed up"
 
@@ -12,7 +14,7 @@ filter = {
   'f_apply'     => 'Apply+Filter'
 }
 
-due_date = Date::parse(ARGV[3])
+due_date = Date::parse(ARGV[4])
 
 galleries = getGalleriesAfter(due_date, ARGV[0], filter, cookies)
 
