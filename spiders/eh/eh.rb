@@ -120,11 +120,9 @@ class Gallery
 
   def downloadPages(cookies)
     puts "Downloading #{@title}"
-    completed = 0
     Parallel.each_with_index(page_urls, :in_processors => $jobs) do |page_url, index|
       downloadSinglePage(page_url, cookies)
-      completed += 1
-      puts "#{completed}/#{page_urls.size} downloaded"
+      puts "#{Dir[File.join(@gid + '*', '*')].size}/#{page_urls.size} downloaded"
     end
   end
 
