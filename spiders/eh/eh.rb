@@ -86,19 +86,34 @@ class Gallery
 
   def downloadSinglePage(page_url, cookies)
     begin
-      puts "Fetch #{page_url}"
-      page = RestClient.get page_url, {:cookies => cookies}
+      begin
+        puts "Fetch #{page_url}"
+        page = RestClient.get page_url, {:cookies => cookies}
+      rescue
+        puts "Failed to fetch #{page_urls}"
+        raise
+      end
+
       html = Nokogiri::HTML(page.body)
       img_url = html.xpath('//img[@id="img"]').first['src']
-      puts "Download #{img_url}"
-      img = RestClient.get img_url, {:cookies => cookies}
-      puts "Downloaded"
+      alt = html.xpath('//*[@id="loadfail"]').first['onclick'][/'(.*)'/, 1]
+      alt_url = "#{page_url}?nl=#{alt}"
+
+      begin
+        puts "Download #{img_url}"
+        img = RestClient.get img_url, {:cookies => cookies}
+      rescue
+        puts "Failed to download #{filename}"
+        page_url = alt_url
+        raise
+      end
+
       filename = img_url.split('/')[-1]
       filepath = File.join(@path, filename)
+      puts "#{filepath} downloaded"
       File.open(filepath, 'wb').write(img.body)
     rescue
-      puts "Download failed"
-      sleep 30
+      sleep 10
       retry
     end
   end
