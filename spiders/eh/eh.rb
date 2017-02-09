@@ -110,7 +110,7 @@ class Gallery
 
       filename = img_url.split('/')[-1]
       filepath = File.join(@path, filename)
-      puts "#{filepath} downloaded"
+      puts "#{filename} downloaded"
       File.open(filepath, 'wb').write(img.body)
     rescue
       sleep 10

@@ -1,6 +1,8 @@
 require './eh.rb'
 
-# CMD: ./new.rb forum user pw oldest-date
+# CMD: ./new.rb forum user pw oldest-date [dest-dir]
+
+Dir.chdir(ARGV[4]) if ARGV[4]
 
 cookies = login(ARGV[0], ARGV[1], ARGV[2])
 
@@ -14,7 +16,7 @@ filter = {
   'f_apply'     => 'Apply+Filter'
 }
 
-due_date = Date::parse(ARGV[4])
+due_date = Date::parse(ARGV[3])
 
 galleries = getGalleriesAfter(due_date, ARGV[0], filter, cookies)
 
