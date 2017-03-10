@@ -5,5 +5,4 @@
 Dir["#{ARGV[0]}/**.html"].each do |html|
   text = File.read(html).gsub(/(?<=[^\p{ASCII}])\n *(?=[^a-zA-Z])/, '')
   File.write(html, text)
-  system("python beautify.py #{html}")
 end
