@@ -19,6 +19,7 @@ class Gallery
   # initialize the gallery object.
   def initialize()
     @page_urls = []
+    @path = '.'
   end
 
   def initByKnownURL(url)
@@ -126,7 +127,7 @@ class Gallery
     end
   end
 
-  private :downloadSinglePage
+  # private :downloadSinglePage
 end
 
 
