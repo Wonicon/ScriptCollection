@@ -97,7 +97,7 @@ class Gallery
     puts @page_urls
   end
 
-  def downloadSinglePage(page_url, cookies)
+  def downloadSinglePage(page_url, index, cookies)
     begin
       begin
         puts "Fetch #{page_url}"
@@ -122,8 +122,10 @@ class Gallery
       end
 
       filename = img_url.split('/')[-1]
-      filepath = File.join(@path, filename)
-      puts "#{filename} downloaded"
+      extname = File.extname(filename)
+      outname = index.rjust(4, '0') + extname  # TODO Will 4 digits be enough?
+      filepath = File.join(@path, outname)
+      puts "#{outname} downloaded"
       File.open(filepath, 'wb').write(img.body)
     rescue
       sleep 10
@@ -139,7 +141,7 @@ class Gallery
     end
 
     Parallel.each_with_index(@page_urls, :in_processors => $jobs) do |page_url, index|
-      downloadSinglePage(page_url, cookies)
+      downloadSinglePage(page_url, index, cookies)
       puts "#{Dir[File.join(@path, '*')].size}/#{@page_urls.size} downloaded"
     end
   end
