@@ -13,7 +13,7 @@ class GalleryPage
   def initialize(cookies, url)
     html = RestClient.get(url, {:cookies => cookies})
     @document = Nokogiri::HTML(html)
-    @page_urls = document.xpath('//a[contains(@href, "/s/")]').map { |a| a['href'] }
+    @page_urls = @document.xpath('//a[contains(@href, "/s/")]').map { |a| a['href'] }
   end
 end
 
@@ -55,9 +55,9 @@ class Gallery
   end
 
   def initByElement(element)
-    @title = row.children[2].child.children[2].child.child.text
-    @date = DateTime.parse(row.children[1].text)
-    @url = row.children[2].child.children[2].child['href']
+    @title = element.children[2].child.children[2].child.child.text
+    @date = DateTime.parse(element.children[1].text)
+    @url = element.children[2].child.children[2].child['href']
     @gid, @token = @url.split('/')[-2..-1]
   end
 
@@ -170,7 +170,11 @@ def getGalleriesFrom(url, filter, cookies)
   html = Nokogiri::HTML(resp.body)
   table = html.xpath('//table[@class="itg"]')
   rows = table.xpath('//tr[contains(@class, "gtr")]')
-  rows.map { |row| Gallery.new(row) }
+  rows.map do |row|
+    gallery = Gallery.new
+    gallery.initByElement(row)
+    gallery
+  end
 end
 
 
@@ -180,6 +184,7 @@ def getGalleriesAfter(date, url, filter, cookies)
   galleries = []
   page_num = 0 # page num index from zero
   loop do
+    puts url
     result = getGalleriesFrom("#{url}?page=#{page_num}", filter, cookies)
     after, before = result.partition { |g| g.date > date }
     galleries += after
