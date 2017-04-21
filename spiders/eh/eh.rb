@@ -4,7 +4,7 @@ require 'nokogiri'
 require 'date'
 
 
-$jobs = 4
+$jobs = 10
 
 
 class GalleryPage
@@ -116,18 +116,18 @@ class Gallery
         puts "Download #{img_url}"
         img = RestClient.get img_url, {:cookies => cookies}
       rescue
-        puts "Failed to download #{filename}"
         page_url = alt_url
         raise
       end
 
       filename = img_url.split('/')[-1]
       extname = File.extname(filename)
-      outname = index.rjust(4, '0') + extname  # TODO Will 4 digits be enough?
+      outname = index.to_s.rjust(4, '0') + extname  # TODO Will 4 digits be enough?
       filepath = File.join(@path, outname)
       puts "#{outname} downloaded"
       File.open(filepath, 'wb').write(img.body)
-    rescue
+    rescue Exception => e
+      puts "Failed to download #{filename}: #{e.message}"
       sleep 10
       retry
     end
@@ -135,14 +135,15 @@ class Gallery
 
   def downloadPages(cookies)
     puts "Downloading #{@title}"
-    if Dir[File.join(@paht, '*')].size == @page_urls.size
+    if Dir[File.join(@gid + '_*', '*')].size == @page_urls.size
       puts "This gallery has bee finished"
       return
     end
 
     Parallel.each_with_index(@page_urls, :in_processors => $jobs) do |page_url, index|
+    #@page_urls.each_with_index do |page_url, index|
       downloadSinglePage(page_url, index, cookies)
-      puts "#{Dir[File.join(@path, '*')].size}/#{@page_urls.size} downloaded"
+      puts "#{Dir[File.join(@gid + '_*', '*')].size}/#{@page_urls.size} downloaded"
     end
   end
 
