@@ -133,9 +133,14 @@ class Gallery
 
   def downloadPages(cookies)
     puts "Downloading #{@title}"
-    Parallel.each_with_index(page_urls, :in_processors => $jobs) do |page_url, index|
+    if Dir[File.join(@paht, '*')].size == @page_urls.size
+      puts "This gallery has bee finished"
+      return
+    end
+
+    Parallel.each_with_index(@page_urls, :in_processors => $jobs) do |page_url, index|
       downloadSinglePage(page_url, cookies)
-      puts "#{Dir[File.join(@gid + '*', '*')].size}/#{page_urls.size} downloaded"
+      puts "#{Dir[File.join(@path, '*')].size}/#{@page_urls.size} downloaded"
     end
   end
 
