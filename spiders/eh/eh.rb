@@ -11,6 +11,7 @@ class GalleryPage
   attr_reader :page_urls
 
   def initialize(cookies, url)
+    puts "Download preview page #{url}"
     html = RestClient.get(url, {:cookies => cookies})
     @document = Nokogiri::HTML(html)
     @page_urls = @document.xpath('//a[contains(@href, "/s/")]').map { |a| a['href'] }
@@ -79,7 +80,7 @@ class Gallery
     # so we need to flatten it at last.
     @page_urls += Parallel.map((1...first_page.page_num).to_a) do |preview_page_index|
       puts "Fetch the #{preview_page_index + 1}th preview page"
-      preview_page = GalleryPage.new("#{@url}?p=#{preview_page_index}", cookies)
+      preview_page = GalleryPage.new(cookies, "#{@url}?p=#{preview_page_index}")
       preview_page.page_urls
     end
     @page_urls = @page_urls.flatten
@@ -88,7 +89,7 @@ class Gallery
       puts "#{@title} is deprecated?"
     else
       puts "#{@page_urls.size} pages found"
-      @path = "#{@gid}_#{@title}"
+      @path = "#{@gid}_#{@title}".gsub(/\//, '_')  # Avoid invalid '/' in title.
       Dir.mkdir(@path) if not File.directory?(@path)
     end
 
