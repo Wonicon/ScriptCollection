@@ -7,6 +7,31 @@ require 'date'
 $jobs = 4
 
 
+class GalleryPage
+  attr_reader :page_urls
+
+  def initialize(cookies, url)
+    html = RestClient.get(url, {:cookies => cookies})
+    @document = Nokogiri::HTML(html)
+    @page_urls = document.xpath('//a[contains(@href, "/s/")]').map { |a| a['href'] }
+  end
+end
+
+
+class GalleryIndex < GalleryPage
+  attr_reader :page_num
+
+  def initialize(cookies, url, title)
+    super(cookies, url)
+    @page_num = @document.xpath('//table[@class="ptt"]/tr').children[-2].children[0].xpath('text()').to_s.to_i
+  end
+
+  def title
+    @document.xpath("//h1[@id='gj']").xpath('text()')
+  end
+end
+
+
 class Gallery
   # Basic string attributes
   attr_reader :title, :date, :url
@@ -37,39 +62,25 @@ class Gallery
   end
 
   ##
-  # Get the preview page number from the pagination bar.
-  def getPreviewPageNum(parsed_first_preview_page)
-    parsed_first_preview_page.xpath('//table[@class="ptt"]/tr').children[-2].children[0].xpath('text()').to_s.to_i
-  end
-
-  ##
-  # Extract the page urls from a given parsed html document text.
-  def getPageUrls(document)
-    document.xpath('//a[contains(@href, "/s/")]').map { |a| a['href'] }
-  end
-
-  ##
   # One preview page contains several single pages.
   # We will iterate on the preview page number to get all single pages' url.
   def getPageList(cookies)
-    document = Nokogiri::HTML(RestClient.get(@url, {:cookies => cookies}))
-
-    @title = document.xpath("//h1[@id='gj']").xpath('text()') if @title == nil
+    first_page = GalleryIndex.new(cookies, @url)
+    @title = first_page.title if @title == nil
     puts "Get page list for gallery #{@title}"
 
-    preview_num = getPreviewPageNum(document)
-    puts "This gallery has #{preview_num} preview pages"
+    puts "This gallery has #{first_page.page_num} preview pages"
 
     # Get the page urls from the first preview page.
     # As we have already got the html text, we have no need to download it again.
-    @page_urls += getPageUrls(document)
+    @page_urls += first_page.page_urls
     # Get the page urls from the rest preview pages.
     # As each preview page contains several pages, it will result in a nested array,
     # so we need to flatten it at last.
-    @page_urls += Parallel.map((1...preview_num).to_a) do |preview_page_index|
+    @page_urls += Parallel.map((1...first_page.page_num).to_a) do |preview_page_index|
       puts "Fetch the #{preview_page_index + 1}th preview page"
-      html = RestClient.get("#{@url}?p=#{preview_page_index}", {:cookies => cookies})
-      getPageUrls(Nokogiri::HTML(html))
+      preview_page = GalleryPage.new("#{@url}?p=#{preview_page_index}", cookies)
+      preview_page.page_urls
     end
     @page_urls = @page_urls.flatten
 
