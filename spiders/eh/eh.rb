@@ -21,7 +21,7 @@ end
 class GalleryIndex < GalleryPage
   attr_reader :page_num
 
-  def initialize(cookies, url, title)
+  def initialize(cookies, url)
     super(cookies, url)
     @page_num = @document.xpath('//table[@class="ptt"]/tr').children[-2].children[0].xpath('text()').to_s.to_i
   end
