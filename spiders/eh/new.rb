@@ -1,10 +1,10 @@
 require './eh.rb'
 
-# CMD: ./new.rb forum user pw oldest-date [dest-dir]
+# CMD: ./new.rb site forum user pw oldest-date [dest-dir]
 
-Dir.chdir(ARGV[4]) if ARGV[4]
+Dir.chdir(ARGV[5]) if ARGV[5]
 
-cookies = login(ARGV[0], ARGV[1], ARGV[2])
+cookies = login(ARGV[1], ARGV[2], ARGV[3])
 
 puts "Get signed up"
 
@@ -16,7 +16,7 @@ filter = {
   'f_apply'     => 'Apply+Filter'
 }
 
-due_date = Date::parse(ARGV[3])
+due_date = Date::parse(ARGV[4])
 
 galleries = getGalleriesAfter(due_date, ARGV[0], filter, cookies)
 
@@ -25,9 +25,5 @@ puts "Get #{galleries.size} galleries in total"
 # Get page list
 galleries.each do |gallery|
   gallery.getPageList(cookies)
-end
-
-# Download pages
-galleries.each do |gallery|
   gallery.downloadPages(cookies)
 end
