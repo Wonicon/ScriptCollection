@@ -6,7 +6,7 @@ Dir.chdir(ARGV[5]) if ARGV[5]
 
 cookies = login(ARGV[1], ARGV[2], ARGV[3])
 
-puts "Get signed up"
+puts 'Get signed up'
 
 filter = {
   'f_doujinshi' => 1,
@@ -16,7 +16,7 @@ filter = {
   'f_apply'     => 'Apply+Filter'
 }
 
-due_date = Date::parse(ARGV[4])
+due_date = Date.parse(ARGV[4])
 
 galleries = getGalleriesAfter(due_date, ARGV[0], filter, cookies)
 

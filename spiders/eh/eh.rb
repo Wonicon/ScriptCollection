@@ -3,16 +3,14 @@ require 'parallel'
 require 'nokogiri'
 require 'date'
 
-
 $jobs = 10
-
 
 class GalleryPage
   attr_reader :page_urls
 
   def initialize(cookies, url)
     puts "Download preview page #{url}"
-    html = RestClient.get(url, {:cookies => cookies})
+    html = RestClient.get(url, cookies: cookies)
     @document = Nokogiri::HTML(html)
     @page_urls = @document.xpath('//a[contains(@href, "/s/")]').map { |a| a['href'] }
   end
@@ -43,7 +41,7 @@ class Gallery
 
   # Use the <tr class="gtr[01]"> tag to
   # initialize the gallery object.
-  def initialize()
+  def initialize
     @page_urls = []
     @path = '.'
   end
@@ -65,9 +63,9 @@ class Gallery
   ##
   # One preview page contains several single pages.
   # We will iterate on the preview page number to get all single pages' url.
-  def getPageList(cookies)
+  def get_page_list(cookies)
     first_page = GalleryIndex.new(cookies, @url)
-    @title = first_page.title if @title == nil
+    @title = first_page.title if @title.nil?
     puts "Get page list for gallery #{@title}"
 
     puts "This gallery has #{first_page.page_num} preview pages"
@@ -85,15 +83,15 @@ class Gallery
     end
     @page_urls = @page_urls.flatten
 
-    if @page_urls.size == 0
+    if @page_urls.empty?
       puts "#{@title} is deprecated?"
     else
       puts "#{@page_urls.size} pages found"
-      @path = "#{@gid}_#{@title}".gsub(/\//, '_')  # Avoid invalid '/' in title.
-      Dir.mkdir(@path) if not File.directory?(@path)
+      @path = "#{@gid}_#{@title}".gsub(%r{/}, '_') # Avoid invalid '/' in title.
+      Dir.mkdir(@path) unless File.directory?(@path)
     end
 
-    puts "Page urls are as follows:"
+    puts 'Page urls are as follows:'
     puts @page_urls
   end
 
@@ -101,7 +99,7 @@ class Gallery
     begin
       begin
         puts "Fetch #{page_url}"
-        page = RestClient.get page_url, {:cookies => cookies}
+        page = RestClient.get(page_url, :cookies => cookies)
       rescue
         puts "Failed to fetch #{page_urls}"
         raise
@@ -114,7 +112,7 @@ class Gallery
 
       begin
         puts "Download #{img_url}"
-        img = RestClient.get img_url, {:cookies => cookies}
+        img = RestClient.get(img_url, :cookies => cookies)
       rescue
         page_url = alt_url
         raise
@@ -122,7 +120,7 @@ class Gallery
 
       filename = img_url.split('/')[-1]
       extname = File.extname(filename)
-      outname = index.to_s.rjust(4, '0') + extname  # TODO Will 4 digits be enough?
+      outname = index.to_s.rjust(4, '0') + extname # TODO: Will 4 digits be enough?
       filepath = File.join(@path, outname)
       puts "#{outname} downloaded"
       File.open(filepath, 'wb').write(img.body)
@@ -136,20 +134,16 @@ class Gallery
   def downloadPages(cookies)
     puts "Downloading #{@title}"
     if Dir[File.join(@gid + '_*', '*')].size == @page_urls.size
-      puts "This gallery has bee finished"
+      puts 'This gallery has bee finished'
       return
     end
 
-    Parallel.each_with_index(@page_urls, :in_processors => $jobs) do |page_url, index|
-    #@page_urls.each_with_index do |page_url, index|
+    Parallel.each_with_index(@page_urls, in_processors: $jobs) do |page_url, index|
       downloadSinglePage(page_url, index, cookies)
       puts "#{Dir[File.join(@gid + '_*', '*')].size}/#{@page_urls.size} downloaded"
     end
   end
-
-  # private :downloadSinglePage
 end
-
 
 ##
 # Login the <host> site with <username> and <password>.
@@ -159,23 +153,19 @@ def login(host, username, password)
     'act' => 'Login',
     'CODE' => '01',
     'CookieDate' => '1',
-    'UserName' => username, 
+    'UserName' => username,
     'PassWord' => password
   }
   # Make the post recognized as a form submitted.
-  headers = { :content_type => 'application/x-www-form-urlencoded' }
+  headers = { content_type: 'application/x-www-form-urlencoded' }
   resp = RestClient.post(host, form, headers)
-  return resp.cookies
+  resp.cookies
 end
-
 
 ##
 # Get one single page of gallery list
 def getGalleriesFrom(url, filter, cookies)
-  resp = RestClient.get "#{url}", {
-    :params => filter,
-    :cookies => cookies
-  }
+  resp = RestClient.get(url.to_s, params: filter, cookies: cookies)
   html = Nokogiri::HTML(resp.body)
   table = html.xpath('//table[@class="itg"]')
   rows = table.xpath('//tr[contains(@class, "gtr")]')
@@ -199,7 +189,7 @@ def getGalleriesAfter(date, url, filter, cookies)
     galleries += after
     puts "Get #{after.size} galleries from page #{page_num + 1} ranging from #{after.first.date} to #{after.last.date}"
     page_num += 1
-    break if before.size != 0
+    break if !before.empty?
   end
   return galleries
 end
